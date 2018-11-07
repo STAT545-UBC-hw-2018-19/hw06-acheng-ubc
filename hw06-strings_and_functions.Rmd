@@ -1,0 +1,24 @@
+---
+title: "STAT547M Assignment 6"
+author: "Alex"
+date: "November 7, 2018"
+output: 
+  github_document:
+    toc: true
+    toc_depth: 4
+always_allow_html: yes
+---
+
+```{r setup, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(gapminder)
+library(kableExtra)
+library(plotly)
+library(scales)
+```
+
+## Factor Management

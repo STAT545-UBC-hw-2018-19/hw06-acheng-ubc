@@ -12,6 +12,7 @@ November 7, 2018
     -   [Applying our functions to the nested dataset](#applying-our-functions-to-the-nested-dataset)
     -   [Unnesting the regression results](#unnesting-the-regression-results)
     -   [Comparing goodness of fit between linear and quadratic models](#comparing-goodness-of-fit-between-linear-and-quadratic-models)
+    -   [Visualizing the regression models](#visualizing-the-regression-models)
 
 ``` r
 knitr::opts_chunk$set(echo = TRUE)
@@ -287,7 +288,87 @@ get_adj_rsq <- function(model){ # create a useful function to output only the ad
   glance(model)$adj.r.squared
 }
 
-nested_rsq <- nested_ds %>%
-  mutate(adj_r2_lin = map(lin_fit, get_adj_rsq)) %>%
-  mutate(adj_r2_quad = map(quad_fit, get_adj_rsq))
+gap_reg_rsq <- nested_ds %>%
+  mutate(adj_r2_lin = as.numeric(map(lin_fit, get_adj_rsq))) %>% # wrap as.numeric() around map() in order to coerce the output to show up when we call head() (otherwise it will just show "dbl [1]")
+  mutate(adj_r2_quad = as.numeric(map(quad_fit, get_adj_rsq))) %>%
+  select(continent, country, adj_r2_lin, adj_r2_quad)
+
+gap_reg_rsq
 ```
+
+    ## # A tibble: 142 x 4
+    ##    continent country     adj_r2_lin adj_r2_quad
+    ##    <fct>     <fct>            <dbl>       <dbl>
+    ##  1 Asia      Afghanistan      0.942       0.987
+    ##  2 Europe    Albania          0.902       0.953
+    ##  3 Africa    Algeria          0.984       0.990
+    ##  4 Africa    Angola           0.877       0.974
+    ##  5 Americas  Argentina        0.995       0.995
+    ##  6 Oceania   Australia        0.978       0.991
+    ##  7 Europe    Austria          0.991       0.993
+    ##  8 Asia      Bahrain          0.963       0.997
+    ##  9 Asia      Bangladesh       0.988       0.997
+    ## 10 Europe    Belgium          0.994       0.995
+    ## # ... with 132 more rows
+
+Now we can filter this tibble to show us which countries were modelled better by the quadratic model by filtering:
+
+``` r
+gap_rsq_quad_better <- gap_reg_rsq %>%
+  filter(adj_r2_quad > adj_r2_lin)
+
+
+gap_rsq_quad_better
+```
+
+    ## # A tibble: 126 x 4
+    ##    continent country     adj_r2_lin adj_r2_quad
+    ##    <fct>     <fct>            <dbl>       <dbl>
+    ##  1 Asia      Afghanistan      0.942       0.987
+    ##  2 Europe    Albania          0.902       0.953
+    ##  3 Africa    Algeria          0.984       0.990
+    ##  4 Africa    Angola           0.877       0.974
+    ##  5 Oceania   Australia        0.978       0.991
+    ##  6 Europe    Austria          0.991       0.993
+    ##  7 Asia      Bahrain          0.963       0.997
+    ##  8 Asia      Bangladesh       0.988       0.997
+    ##  9 Europe    Belgium          0.994       0.995
+    ## 10 Africa    Benin            0.963       0.994
+    ## # ... with 116 more rows
+
+It seems that the majority of countries were plotted better by the quadratic model (126 out of 142 countries). Perhaps we narrow it down by seeing which countries were modelled poorly by a linear regression. We will choose an adj.r.sq of less than 0.5 to be a poor fit:
+
+``` r
+gap_rsq_poorfit <- gap_reg_rsq %>%
+  filter(adj_r2_lin < 0.5)
+
+gap_rsq_poorfit
+```
+
+    ## # A tibble: 15 x 4
+    ##    continent country                  adj_r2_lin adj_r2_quad
+    ##    <fct>     <fct>                         <dbl>       <dbl>
+    ##  1 Africa    Botswana                   -0.0626        0.626
+    ##  2 Africa    Central African Republic    0.443         0.865
+    ##  3 Africa    Congo, Dem. Rep.            0.283         0.669
+    ##  4 Africa    Congo, Rep.                 0.472         0.903
+    ##  5 Africa    Cote d'Ivoire               0.212         0.842
+    ##  6 Africa    Kenya                       0.387         0.873
+    ##  7 Africa    Lesotho                    -0.00666       0.638
+    ##  8 Africa    Liberia                     0.463         0.527
+    ##  9 Africa    Namibia                     0.381         0.878
+    ## 10 Africa    Rwanda                     -0.0811       -0.201
+    ## 11 Africa    South Africa                0.244         0.771
+    ## 12 Africa    Swaziland                  -0.0250        0.671
+    ## 13 Africa    Uganda                      0.276         0.561
+    ## 14 Africa    Zambia                     -0.0342        0.668
+    ## 15 Africa    Zimbabwe                   -0.0381        0.647
+
+We see that 15 countries were fitted poorly by our definitions, and interestingly they are all countries in Africa. This could be due to factors external to typical life expectancy growth such as warfare that may strike and lower life expectancies during isolated periods of time. Unsurprisingly, most of these countries were better fitted by a quadratic model as the quadratic term allows for the relationship to be non-monotonic. (*Exception here seems to be Rwanda, but as we know the Rwandan Genocide is a factor that may greatly outweigh any gradual changes that would be easily modelled using a second-order linear regression.*)
+
+We can also visualize the goodness of fit visually using the plot\_reg() function we created in part 1 of this assignment.
+
+Visualizing the regression models
+---------------------------------
+
+Initially I had wanted to use map() to apply my plot\_reg() function from the first part of the assignment to be able to visualize the linear and quadratic regressions for every country, but I encountered a lot of problems that I could not fix in time for assignment submission.....so this will be a WIP for the future!

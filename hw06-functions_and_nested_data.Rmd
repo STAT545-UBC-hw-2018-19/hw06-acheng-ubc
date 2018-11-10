@@ -176,13 +176,38 @@ get_adj_rsq <- function(model){ # create a useful function to output only the ad
   glance(model)$adj.r.squared
 }
 
-nested_rsq <- nested_ds %>%
-  mutate(adj_r2_lin = map(lin_fit, get_adj_rsq)) %>%
-  mutate(adj_r2_quad = map(quad_fit, get_adj_rsq))
+gap_reg_rsq <- nested_ds %>%
+  mutate(adj_r2_lin = as.numeric(map(lin_fit, get_adj_rsq))) %>% # wrap as.numeric() around map() in order to coerce the output to show up when we call head() (otherwise it will just show "dbl [1]")
+  mutate(adj_r2_quad = as.numeric(map(quad_fit, get_adj_rsq))) %>%
+  select(continent, country, adj_r2_lin, adj_r2_quad)
+
+gap_reg_rsq
 ```
 
+Now we can filter this tibble to show us which countries were modelled better by the quadratic model by filtering:
+```{r}
+gap_rsq_quad_better <- gap_reg_rsq %>%
+  filter(adj_r2_quad > adj_r2_lin)
 
 
+gap_rsq_quad_better
+```
+
+It seems that the majority of countries were plotted better by the quadratic model (126 out of 142 countries). Perhaps we narrow it down by seeing which countries were modelled poorly by a linear regression. We will choose an adj.r.sq of less than 0.5 to be a poor fit:
+```{r}
+gap_rsq_poorfit <- gap_reg_rsq %>%
+  filter(adj_r2_lin < 0.5)
+
+gap_rsq_poorfit
+```
+
+We see that 15 countries were fitted poorly by our definitions, and interestingly they are all countries in Africa. This could be due to factors external to typical life expectancy growth such as warfare that may strike and lower life expectancies during isolated periods of time. Unsurprisingly, most of these countries were better fitted by a quadratic model as the quadratic term allows for the relationship to be non-monotonic. (*Exception here seems to be Rwanda, but as we know the Rwandan Genocide is a factor that may greatly outweigh any gradual changes that would be easily modelled using a second-order linear regression.*)
+
+We can also visualize the goodness of fit visually using the plot_reg() function we created in part 1 of this assignment.
+
+##Visualizing the regression models
+
+Initially I had wanted to use map() to apply my plot_reg() function from the first part of the assignment to be able to visualize the linear and quadratic regressions for every country, but I encountered a lot of problems that I could not fix in time for assignment submission.....so this will be a WIP for the future!
 
 
 

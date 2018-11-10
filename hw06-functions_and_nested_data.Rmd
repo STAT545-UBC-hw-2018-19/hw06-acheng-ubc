@@ -34,6 +34,7 @@ le_lin_fit <- function(dat, offset = 1952) {
 We will add some extra functionality to this.
 
 ### Adding a quadratic term
+
 A linear regression is good for estimating the relationship between variables that are proportional to each other (i.e. $y = b_0 + b_1x_1$ where $b_0$ is your intercept and $b_1$ is the estimated slope). However, this is a very simple model, and many real-world datasets will have more complex relationships. Consider the example of Zimbabwe's life expectancy in the gapminder dataset:
 
 ```{r}
@@ -57,7 +58,8 @@ quad_reg <- function(dat, offset = 1952){
 gapminder %>% filter(country == "Zimbabwe") %>% quad_reg()
 ```
 
-### Output a scatter plot with a linear regression line
+### Output a scatter plot with regression lines
+
 A regression model with just the coefficients and the p-value tells us little about the fit of the model and the distribution of the data. A scatter plot with a linear regression line will give valuable quantitative data. 
 
 
@@ -69,28 +71,118 @@ We can streamline this process by writing a function to do this. First let's edi
 quad_reg <- function(dat, offset = 1952){
   lm(lifeExp ~ I(year - offset) + I((year - offset)^2), dat) # subtract offset from year allows for better interpretation of the intercept
 }
+
+gapminder %>% filter(country == "Zimbabwe") %>% quad_reg(.)
 ```
 
 
-
+Now let's create our function that will plot the scatter plot of the data as well as compare the regression lines from our linear regression and our quadratic regression:
 ```{r}
-plot_reg <- function(dat, offset = 1952){
-  model <- quad_reg(dat) # model calculated by our quadratic regression function we wrote earlier
-  dat <- cbind(dat, predict(model, interval = "confidence")) #add predicted values as a new column to the given data frame
+plot_reg <- function(dat, quad_mod, offset = 1952){
+  dat <- cbind(dat, predict(quad_mod, interval = "confidence")) #add predicted values as a new column to the given data frame
   
   ggplot(dat, aes(I(year - offset), lifeExp)) +
     geom_point() +
-    geom_line(aes(I(year - offset), fit), colour = "Blue") + # plot regression line by linking together a scatter plot of the predicted values from predict()
-    geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2) + # confidence interval
-    labs(x = "Years since 1952", y = "Life Expectancy (Years)")
+    geom_smooth(method="lm", colour = "Blue") + # linear regression line
+    geom_line(aes(I(year - offset), fit),  colour = "Red", size=0.5) + # plot regression line by linking together a scatter plot of the predicted values from predict()
+    geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2) +# confidence interval
+    labs(x = "Years since 1952", y = "Life Expectancy (Years)") +
+    scale_colour_manual("",
+                        breaks = c("Linear Fit", "Quadratic Fit"),
+                        values = c("Blue", "Red"))
 }
 
-gapminder %>% filter(country == "Zimbabwe") %>% plot_reg()
+gapminder %>% filter(country == "Zimbabwe") %>% plot_reg(., quad_reg(.))
 ```
 
-This regression clearly fits the data better than the linear model from before!
+The quadratic regression (red) clearly fits the data better than the linear model (blue) from before!
 
 # Working with nested datasets
+## Nesting the Gapminder data frame
+*Creation of the nested data frame follows the lesson by Jenny Bryan found [here](http://stat545.com/block024_group-nest-split-map.html#split-apply-combine)*
+
+We will nest the gapminder dataframe by country and continent:
+```{r}
+nested_ds <- gapminder %>%
+  group_by(continent, country) %>%
+  nest()
+
+head(nested_ds)
+```
+
+Using nest() after group_by() collapses all the data pertaining to each distinct country in each continent into one row; i.e. all the data is now held in a list-column in column 3 for each country.
+
+We can view how the data stored in the list column by subsetting the first element:
+```{r}
+nested_ds[[1, "data"]]
+```
+
+In this list-column state, we can use map() from purrr inside mutate() in order to apply a function over each country, and store the results inside another list-column in column 4. 
+
+## Applying our functions to the nested dataset
+
+Let's apply the linear regression from [this STAT545 lesson](http://stat545.com/block012_function-regress-lifeexp-on-year.html) and the quadratic regression function we created above to every country in the gapminder dataset. We will modify the linear regression to match the quadratic regression function we created above to output the entire fitted model (and not just the intercept and slope):
+```{r}
+lin_reg <- function(dat, offset = 1952) {
+  lm(lifeExp ~ I(year - offset), dat)
+}
+
+nested_ds <- nested_ds %>%
+  mutate(lin_fit = map(data, lin_reg)) %>%
+  mutate(quad_fit = map(data, quad_reg)) 
+
+nested_ds[[1, "lin_fit"]]
+nested_ds[[1, "quad_fit"]]
+```
+
+Now that we have fitted models for every country stored in columns 3 and 4, we can use tidy() from the broom package (from STAT545 Lecture 14) to summarize each model with the estimate, standard error, t-statistic, and p-value for each term in the model:
+```{r}
+nested_ds <- nested_ds %>%
+  mutate(tidy_lin = map(lin_fit, tidy)) %>%
+  mutate(tidy_quad = map(quad_fit, tidy))
+```
+
+##Unnesting the regression results
+We can now create a data frame containing just the results of our regressions by using the select() and unnest() functions. After unnesting, we can pick out just the coefficient estimates for each term in the model by using the spread() function:
+```{r}
+gap_lin_coefs <- nested_ds %>%
+  select(continent, country, tidy_lin) %>%
+  unnest(tidy_lin) %>%
+  select(continent, country, term, estimate) %>%
+  mutate(term = recode(term, `(Intercept)` = "intercept", `I(year - offset)` = "slope")) %>%
+  spread(key = term, value = estimate)
+
+gap_quad_coefs <- nested_ds %>%
+  select(continent, country, tidy_quad) %>%
+  unnest(tidy_quad) %>%
+  select(continent, country, term, estimate) %>%
+  mutate(term = recode(term, `(Intercept)` = "intercept",
+                       `I(year - offset)` = "slope",
+                       `I((year - offset)^2)` = "quadratic")) %>% # rename estimate columns
+  spread(key = term, value = estimate) %>%
+  select(continent, country, intercept, slope, quadratic) # reorder columns to make more sense (estimates are in order of degree)
+
+head(gap_lin_coefs)
+head(gap_quad_coefs)
+```
+
+Now we have two very organized tables presenting the results of linear and quadratic regressions for every country in the gapminder dataset!
+
+## Comparing goodness of fit between linear and quadratic models
+
+We can also compare the goodness of fit between the linear and quadratic regressions by applying glance() from the broom package to our previous nested dataset:
+```{r}
+get_adj_rsq <- function(model){ # create a useful function to output only the adj rsq value from glance() to avoid cluttering data frame with unncessary variables
+  glance(model)$adj.r.squared
+}
+
+nested_rsq <- nested_ds %>%
+  mutate(adj_r2_lin = map(lin_fit, get_adj_rsq)) %>%
+  mutate(adj_r2_quad = map(quad_fit, get_adj_rsq))
+```
+
+
+
 
 
 

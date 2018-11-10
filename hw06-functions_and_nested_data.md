@@ -368,9 +368,34 @@ gap_rsq_poorfit
 
 We see that 15 countries were fitted poorly by our definitions, and interestingly they are all countries in Africa. This could be due to factors external to typical life expectancy growth such as warfare that may strike and lower life expectancies during isolated periods of time. Unsurprisingly, most of these countries were better fitted by a quadratic model as the quadratic term allows for the relationship to be non-monotonic. (*Exception here seems to be Rwanda, but as we know the Rwandan Genocide is a factor that may greatly outweigh any gradual changes that would be easily modelled using a second-order linear regression.*)
 
-We can also visualize the goodness of fit visually using the plot\_reg() function we created in part 1 of this assignment.
-
 Visualizing the regression models
 ---------------------------------
 
-Initially I had wanted to use map() to apply my plot\_reg() function from the first part of the assignment to be able to visualize the linear and quadratic regressions for every country, but I encountered a lot of problems that I could not fix in time for assignment submission.....so this will be a WIP for the future!
+We can also visualize the goodness of fit visually using the plot\_reg() function we created in part 1 of this assignment or by using ggplot2 workflows with the gap\_lin\_coefs and gap\_quad\_coefs tibbles we created earlier:
+
+``` r
+gap_lin_coefs %>%
+  gather(key = term, value = estimate, intercept, slope) %>%
+  ggplot(aes(estimate)) +
+  geom_density() +
+  facet_wrap(~ term, scales = "free") # allow the axes to have different scales with scales = "free"
+```
+
+![](hw06-functions_and_nested_data_files/figure-markdown_github/unnamed-chunk-14-1.png)
+
+We can also compare this to the distribution of estimates in our quadratic model:
+
+``` r
+gap_lin_coefs$type <- "linear"
+gap_quad_coefs$type <- "quadratic"
+lin_quad_coefs <- rbind(gap_lin_coefs,
+                        gap_quad_coefs %>% select(continent, country, intercept, slope, type)) # combine lin and quad coefficients into one data frame for plotting; we can use the new "type" variable to distinguish between the different estimates
+
+lin_quad_coefs %>%
+  gather(key = term, value = estimate, intercept, slope) %>%
+  ggplot(aes(estimate, colour = type)) +
+  geom_density() +
+  facet_wrap(~ term, scales = "free") # allow the axes to have different scales with scales = "free"
+```
+
+![](hw06-functions_and_nested_data_files/figure-markdown_github/unnamed-chunk-15-1.png)

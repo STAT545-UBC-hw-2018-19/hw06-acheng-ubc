@@ -31,6 +31,8 @@ Writing a function to work with the Gapminder dataset
 Extension of the linear regression function from [this STAT545 page](http://stat545.com/block012_function-regress-lifeexp-on-year.html)
 ---------------------------------------------------------------------------------------------------------------------------------------
 
+*Additional function writing has been done in the next section on nested datasets as well.*
+
 The original linear regression function from the above webpage takes a subset of the gapminder data set and runs a linear regression model with life expectancy as the outcome and year as the predictor, then outputs the coefficients of the model:
 
 ``` r
